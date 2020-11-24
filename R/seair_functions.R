@@ -3,17 +3,17 @@ seair <- function(param, init, start = 0, end = 250, dt) {
   val <- seairCpp(beta = exp(param[["beta"]]),
          infa =       param[["infa"]],        # reduction of infectious if asymptomatic
          p_symp =     param[["p_symp"]],      # proportion of cases that are symptomatic
-         rho =        param[["rho"]],
-         eps =        param[["eps"]],         # rate from exposed to infectious
+         rho =        param[["rho"]],# rate from exposed to infectious (duration latent period)
+         eps =        param[["eps"]],         # rate from pre-clinical to clinical (duration pre-clinical)
          p_hosp =     param[["p_hosp"]],      # probabiliyt of hospitalization if symptomatic
          sigma_h =    param[["sigma_h"]],     # rate from symptomatic to hospitalization
          sigma_c =    param[["sigma_c"]],     # rate from infectious to recovered
          sigma_d =    param[["sigma_d"]],     # rate from hospitalized to recovered (alive)
          conf_rate =  param[["conf_rate"]],   # confirmation rate among those with symptoms (delays of 5 days from symptom onset)
          mu =         param[["mu"]],          # covid-mortality rate among hospitalized patients
-         num_import = param[["num_import"]],
-         prp_detect = param[["prp_detect"]], # proportion of imported cases detected
-         p_conf     = param[["p_conf"]],
+         num_import = param[["num_import"]],  # number of imported cases
+         prp_detect = param[["prp_detect"]],  # proportion of imported cases detected
+         p_conf     = param[["p_conf"]],      # probability of a symptomatic case being detected
          init       = init,
          start = start, end = end, dt = dt)
   val <- as.data.frame(val)
@@ -357,16 +357,16 @@ if (is.null( SEIR_Const[["prior_sd_rw"]])) {
 require(nimble)
 FUN_SEAIRc <- nimble::nimbleRcall(function(
         beta =        double(1),
-        infa =        double(0),        # reduction of infectious if asymptomatic
-        p_symp =      double(0),      # proportion of cases that are symptomatic
+        infa =        double(0),    # reduction of infectious if asymptomatic
+        p_symp =      double(0),    # proportion of cases that are symptomatic
         rho =         double(0),
-        eps =         double(0),         # rate from exposed to infectious
-        p_hosp =      double(0),      # probabiliyt of hospitalization if symptomatic
-        sigma_h =     double(0),     # rate from symptomatic to hospitalization
-        sigma_c =     double(0),     # rate from infectious to recovered
-        sigma_d =     double(0),     # rate from hospitalized to recovered (alive)
-        conf_rate =   double(1),   # confirmation rate among those with symptoms (delays of 5 days from symptom onset)
-        mu =          double(0),          # covid-mortality rate among hospitalized patients
+        eps =         double(0),    # rate from exposed to infectious
+        p_hosp =      double(0),    # probabiliyt of hospitalization if symptomatic
+        sigma_h =     double(0),    # rate from symptomatic to hospitalization
+        sigma_c =     double(0),    # rate from infectious to recovered
+        sigma_d =     double(0),    # rate from hospitalized to recovered (alive)
+        conf_rate =   double(1),    # confirmation rate among those with symptoms (delays of 5 days from symptom onset)
+        mu =          double(0),    # covid-mortality rate among hospitalized patients
         num_import =  double(1),
         prp_detect =  double(0),
         p_conf     =  double(1),
@@ -378,22 +378,19 @@ FUN_SEAIRc <- nimble::nimbleRcall(function(
 # Write your nimble model here - the likelihood + priors
 SEAIR_Code <- nimble::nimbleCode({
   # prior
-  # exp(log(2.6 * SEIR_Const$sigma_c) - 1.96 * 0.2) / SEIR_Const$sigma_c; exp(log(2.6 * SEIR_Const$sigma_c) + 1.96 * 0.2) / sigma_c
-  # R0 in symptomatic is: 2.6 / (-SEIR_Const$infa * SEIR_Const$p_symp + SEIR_Const$infa + SEIR_Const$p_symp)
-  b[1] ~ dnorm(log(2.6 * sigma_c), sd = 0.2)
-  b_exp[1:(beta_ind[1] - 1)] <- exp(b[1])
+  # plogis(qlogis(2.6 / 3) - 1.96 * 0.5) * 3 ;
+  # plogis(qlogis(2.6 / 3) + 1.96 * 0.5) * 3;
+  b[1] ~ dnorm(logit(2.6 * sigma_c / 3), sd = 0.5)
+  b_exp[1:(beta_ind[1] - 1)] <- ilogit(b[1]) * (3 * sigma_c)
   for (i in 2:n_beta) {
     b[i] ~ dnorm(mean = b[i - 1], sd = sd_rw)
-    b_exp[beta_ind[i - 1]:(beta_ind[i] - 1)] <- exp(b[i])
+    b_exp[beta_ind[i - 1]:(beta_ind[i] - 1)] <- ilogit(b[i]) * (3 * sigma_c)
   }
   sd_rw ~ T(dt(mu = prior_sd_rw[1], sigma = prior_sd_rw[2], df = 1), 0, 100) # half-cauchy prior
-  #sd_rw ~ dgamma(shape = 1, rate = 1 / 1) # dgamma(shape = 5, rate = 1 / 5) # dgamma(b, b/a) where a/b is the mean and var is a/b^2
+  # sd_rw ~ dgamma(shape = 1, rate = 1 / 1) # dgamma(shape = 5, rate = 1 / 5) # dgamma(b, b/a) where a/b is the mean and var is a/b^2
   # plot(dgamma(seq(0, 10, 0.01), shape = 0.1, scale = 0.1) ~ seq(0, 10, 0.01), type = "l")
   # hist(rgamma(10000, shape = 100, scale = 0.1), breaks = 100)
-  b_exp[beta_ind[n_beta - 1]:niter] <- exp(b[n_beta])
-
-  b_last_log ~ dnorm(mean = b[n_beta], sd = sd_rw)
-  b_last <- exp(b_last_log)
+  b_exp[beta_ind[n_beta - 1]:niter] <- ilogit(b[n_beta]) * (3 * sigma_c)
 
   import_t0 ~ dunif(0, max_t0)
   num_import[1] <- import_t0
@@ -421,9 +418,9 @@ SEAIR_Code <- nimble::nimbleCode({
     }
 
   # dispersion for negative binomial
-  theta_nc ~ dgamma(shape = 10, rate = 10/1000) # dgamma(b, b/a) where a is the mean and var is a^(2/b)
-  theta_nh ~ dgamma(shape = 10, rate = 10/1000)
-  theta_dx ~ dgamma(shape = 10, rate = 10/1000)
+  theta_nc ~ dgamma(shape = 100, rate = 100/1000) # dgamma(b, b/a) where a is the mean and var is a^(2/b)
+  theta_nh ~ dgamma(shape = 100, rate = 100/1000)
+  theta_dx ~ dgamma(shape = 100, rate = 100/1000)
 
   for (z in 1:Z) {
     prd_nc[z] ~ dnegbin(prd_p_nc[z], prd_r_nc)
@@ -446,13 +443,13 @@ SEAIR_Code <- nimble::nimbleCode({
 # 0.7 / (-SEIR_Const$infa * SEIR_Const$p_symp + SEIR_Const$infa + SEIR_Const$p_symp)
 b_inits <- log(c(runif(1, min = 2, max = 3),
              runif(1, min = 1, max = 2),
-             runif(SEIR_Const$n_beta - 2, min = 0.5, max = 1)) / (1 / SEIR_Const[["eps"]] + 1 / SEIR_Const[["sigma_c"]]) )
+             runif(SEIR_Const$n_beta - 2, min = 0.5, max = 1.5)) / (1 / SEIR_Const[["eps"]] + 1 / SEIR_Const[["sigma_c"]]) )
 SEAIR_Inits <-  list(b = b_inits,
                    import_t0 = runif(1, min = 0, max = SEIR_Const$max_t0),
-                   theta_nc = runif(1, min = 10, max = 1000),
-                   theta_nh = runif(1, min = 10, max = 1000),
-                   theta_dx = runif(1, min = 10, max = 1000),
-                   sd_rw = runif(1, min = 0.2, max = 0.8))
+                   theta_nc = runif(1, min = 500, max = 1500),
+                   theta_nh = runif(1, min = 500, max = 1500),
+                   theta_dx = runif(1, min = 500, max = 1500),
+                   sd_rw = runif(1, min = 0.1, max = 0.3))
 
 SEAIR_Model <- nimble::nimbleModel(SEAIR_Code, SEIR_Const, SEIR_Data, inits = SEAIR_Inits)
 
@@ -461,11 +458,15 @@ cSEAIR <- nimble::compileNimble(SEAIR_Model)
 
 SEAIRConf <- nimble::configureMCMC(cSEAIR, thin = n_thin, autoblock = TRUE)
 SEAIRConf$addMonitors(c("b", "import_t0",
-                       "sd_rw", "b_last",
+                       "sd_rw",
                        "theta_nc", "theta_nh", "theta_dx",
                        "prd_nc", "prd_nh", "prd_dx", "prd_rx", "beta_iter"))
-SEAIRConf$removeSamplers(c("b", "sd_rw"))
-SEAIRConf$addSampler(target = c("b", "sd_rw"), type = 'AF_slice')
+SEAIRConf$removeSamplers(c("b", "sd_rw", "theta_nc", "theta_dx"))
+stochastic_nodes <- c(paste("b[", seq(1:(SEIR_Const$n_beta - 4)), "]", sep = ""), "sd_rw")
+prediction_nodes <- paste("b[", ((SEIR_Const$n_beta - 3):SEIR_Const$n_beta), "]",
+                          sep = "", "theta_nc", "theta_dx")
+SEAIRConf$addSampler(target = stochastic_nodes, type = 'AF_slice')
+SEAIRConf$addSampler(target = prediction_nodes, type = 'posterior_predictive')
 
 
 SEAIRMCMC <- nimble::buildMCMC(SEAIRConf)

@@ -53,7 +53,7 @@ data_panel <- tibble(x = c(min(df$date), min(df$date)),
                      y = c(170, 3.25),
                      outcome = c("Hospitalisations", "Rt"),
                      label = c("A) New hospitalisations (Daily)",
-                               "B) Reproductive number - R(t)"))
+                               "B) Effective Reproductive number - R(t)"))
 
 # Data for custom legend
 data_legend <- tibble(x = rep(min(df$date), 4),
@@ -84,18 +84,18 @@ plot1 <- ggplot(df %>% filter(date <= max(df_empi$date)), aes(x = date)) +
                col = "grey40", alpha = 0.8, lty=3) +
   geom_text(data = data_seg1, aes(x = x, y = ymax), label = "First measures",
             col = "grey20", alpha = 0.8, hjust = 0, nudge_x = 0.5, vjust = 0,
-            size = 3,fontface = "bold") +
+            size = 5,fontface = "bold") +
   geom_segment(data = data_seg2, aes(x = x, xend = x, y = ymin, yend = ymax),
                col = "grey40", alpha = 0.8, lty=3) +
-  geom_text(data = data_seg2, aes(x = x, y = ymax), label = "Law on essential services",
-            col = "grey20", alpha = 0.8, hjust = 0, nudge_x = 0.5, vjust = 0,
-            size = 3, fontface = "bold") +
-  geom_text(data = data_panel, aes(x = x, y = y, label = label), size = 4,
-            col = "grey40", hjust = 0, nudge_x = 0.5, vjust = 0) +
+  #geom_text(data = data_seg2, aes(x = x, y = ymax), label = "Law on essential services",
+   #         col = "grey20", alpha = 0.8, hjust = 0, nudge_x = 0.5, vjust = 0,
+    #        size = 3, fontface = "bold") +
+  geom_text(data = data_panel, aes(x = x, y = y, label = label), size = 5,
+            col = "grey40", hjust = 0, nudge_x = 0.5, vjust = 0, fontface = "bold") +
   geom_point(data = data_legend, aes(x = x, y = y), col = data_legend$coloring,
              fill = data_legend$coloring, shape = 22, size = 2) +
   geom_text(data = data_legend, aes(x = x, y = y, label = labels), size = 3,
-            col = "grey40", hjust = 0, nudge_x = 2, vjust = 0.5) +
+            col = "grey40", hjust = 0, nudge_x = 2, vjust = 0.5, fontface = "bold") +
   facet_wrap(~outcome, nrow = 2, scales = "free_y",
              strip.position = "left",
              labeller = as_labeller(c("Hospitalisations" = "Hospitalisations",
@@ -106,8 +106,8 @@ plot1 <- ggplot(df %>% filter(date <= max(df_empi$date)), aes(x = date)) +
   expand_limits(y = 0) +
   labs(x = "Date") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1, family = "Source Sans Pro"),
-        strip.text = element_text(size = 10, family = "Source Sans Pro"),
-        axis.title.x = element_text(size = 10, family = "Source Sans Pro"),
+        strip.text = element_text(size = 15, face = "bold", family = "Source Sans Pro"),
+        axis.title.x = element_text(size = 15, face = "bold", family = "Source Sans Pro"),
         strip.background = element_blank(),
         strip.placement = "outside",
         axis.title.y = element_blank(),

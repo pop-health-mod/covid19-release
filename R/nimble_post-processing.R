@@ -253,7 +253,7 @@ plot_forecast_wrapper <- function(out, SEIR_Data, SEIR_Const,
   text(x = today + 1.1, y = 0, "Scénario", pos = 4, srt = 0,
        col = rgb(100, 100, 100, 176, max = 255))
   text(x = min(time_date), y = y_lim_r[2] * 0.95, "D) Taux de reproduction - R(t)", pos = 4)
-  mtext("R(t)", side = 2, line = 3, cex = 0.65)
+  mtext("Taux", side = 2, line = 3, cex = 0.65)
   int_1 <- start_date + SEIR_Const$intervention1_ind * SEIR_Const$dt - SEIR_Const$dt
   int_2 <- start_date + SEIR_Const$intervention2_ind * SEIR_Const$dt - SEIR_Const$dt
   y0 <- r0_uci[which(time_date == int_1)] + 0.25
@@ -287,7 +287,7 @@ plot_hospit <- function(out, SEIR_Data, SEIR_Const,
                           today = today, forecast = 7,
                           file_name = "Quebec",
                           plot_title = "Québec",
-                          ylim_hosp = c(0, 120),
+                          ylim_hosp = c(0, 140),
                           save = FALSE, watermark = TRUE,
                           width = 5, height = 6.5, unit = 'in', quality = 75,
                           res = 320, report = FALSE) {
@@ -361,7 +361,7 @@ plot_hospit_wrapper <- function(out, SEIR_Data, SEIR_Const,
           y = c(nh$l50, rev(nh$u50)),
           col = rgb(245, 160, 142, 175, max = 255), border = NA)
   lines(nh$median ~ time_date, col = rgb(210, 140, 130, 255, max = 255), lwd = 2)
-  points(data_nh$nh ~ data_nh$time_date, pch = 16,
+  points(data_nh$nh ~ data_nh$time_date, pch = 16, cex = 0.6,
          col = rgb(100, 100, 100, 200, max = 255))
   abline(v = max(data_nh$time_date + 1), col = "grey50", lty = 2)
   text(x = max(data_nh$time_date + 1.1), y = 0, "Prédiction", pos = 4, srt = 90,
@@ -376,7 +376,7 @@ plot_hospit_wrapper <- function(out, SEIR_Data, SEIR_Const,
          col = rgb(1, 0, 0, 0.3), # translucent (0.2 = 20%) red color
          srt = 35) # srt = angle of text: 45 degree angle to X axis
   }
-  legend(x = time_date[1], y = ylim_hosp[2] * 0.3, legend = c("ICr 50%", "ICr 95%"),
+  legend(x = time_date[1], y = ylim_hosp[2] * 0.9, legend = c("ICr 50%", "ICr 95%"),
          pch = 15, pt.cex = 1.5, cex = 0.8, bty = 'n',
          col = c(rgb(245, 160, 142, 200, max = 255), rgb(245, 160, 142, 125, max = 255)))
 
@@ -398,7 +398,7 @@ plot_hospit_wrapper <- function(out, SEIR_Data, SEIR_Const,
   text(x = max(data_nh$time_date) + 1.1, y = 0, "Prédiction", pos = 4, srt = 90,
        col = rgb(100, 100, 100, 176, max = 255), cex = 0.7)
   text(x = min(time_date), y = y_lim_r[2] * 0.95, "B) Taux de reproduction - R(t)", pos = 4)
-  mtext("R(t)", side = 2, line = 2.5, cex = 1)
+  mtext("Taux", side = 2, line = 2.5, cex = 1)
   int_1 <- start_date + SEIR_Const$intervention1_ind * SEIR_Const$dt - SEIR_Const$dt
   int_2 <- start_date + SEIR_Const$intervention2_ind * SEIR_Const$dt - SEIR_Const$dt
   y0 <- r0_uci[which(time_date == int_1)] + 0.25
@@ -407,12 +407,6 @@ plot_hospit_wrapper <- function(out, SEIR_Data, SEIR_Const,
          x1 = int_1, y1,
          code = 1, length = 0.05, col = "grey50")
   text(x = int_1 + 0.5, y = y1 + 0.25, pos = 4, "Premières mesures", col = "grey50")
-  y0 <- r0_uci[which(time_date == int_2)] + 0.25
-  y1 <- r0_uci[which(time_date == int_2)] + 1
-  arrows(x0 = int_2, y0,
-         x1 = int_2, y1,
-         code = 1, length = 0.05, col = "grey50")
-  text(x = int_2 + 0.5, y = y1, pos = 4, "Loi services essentiels", col = "grey50")
   if (watermark) {
     text(x = grconvertX(0.5, from = "npc"),  # align to center of plot X axis
          y = grconvertY(0.5, from = "npc"), # align to center of plot Y axis

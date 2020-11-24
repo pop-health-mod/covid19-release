@@ -3,7 +3,7 @@ devtools::load_all("~/Google Drive/McGill/Research/Covid/covid19")
 
 
 today <- as.Date("2020-07-01") - 1
-load( paste("./output/output_relache_rw_", today + 1, sep = ""))
+load( paste("./output/archive_1/output_relache_rw_", today + 1, sep = ""))
 
 start_date <- as.Date("2020-02-27")
 start <- 0
@@ -96,11 +96,36 @@ scenario_0315 <- run_scenario_relache(SEIR_Data, SEIR_Const, fit,
                          import_scenario = import_0315, rw = TRUE)
 out_0315 <- get_out_scenario_relache(scenario_0315, max_time)
 
+# ---- Lock down one week earlier ----
+date_measures <- as.Date("2020-03-16")
+scenario_date <- date_measures - 7
+scenario_1w_earlier <- run_scenario_lockdown_relache(SEIR_Data, SEIR_Const, fit,
+                                                     import_scenario = SEIR_Data$num_import,
+                                                     start_date = start_date,
+                                                     date_measures = date_measures,
+                                                     rw = TRUE)
+out_measures_1w_earlier <- get_out_scenario_relache(scenario_1w_earlier, max_time)
+
+# ---- Measures one week later ----
+date_measures <- as.Date("2020-03-16")
+scenario_date <- date_measures + 7
+scenario_1w_later <- run_scenario_relache_measures(SEIR_Data, SEIR_Const, fit,
+                                                   import_scenario = SEIR_Data$num_import,
+                                                   start_date = start_date,
+                                                   date_measures = date_measures,
+                                                   scenario_date = scenario_date, rw = TRUE)
+out_measures_1w_later <- get_out_scenario_relache(scenario_1w_later, max_time)
+
 # ---- impact ----
 get_out_impact(scenario, scenario_0315, max_time)
 get_out_impact(scenario, scenario_0308, max_time)
 get_out_impact(scenario, scenario_ont_0308, max_time)
 get_out_impact(scenario, scenario_ont, max_time)
+get_out_impact(scenario, scenario_1w_earlier, max_time)
+get_out_impact(scenario, scenario_1w_later, max_time)
+get_out_impact(scenario_1w_later, scenario, max_time, results = "ratio")
+
+round(out_measures_1w_later$cum_nh[nrow(out_measures_1w_later$cum_nh), ] / 100, 0) * 100
 
 # ---- graphs ----
 time_date <- seq(start_date + 1, as.Date(start_date + max_time), by = "day")
@@ -119,11 +144,12 @@ fam <- "Source Sans Pro"
 # extrafont::font_import(pattern = fam, prompt = F)
 # extrafont::loadfonts(quiet = T)
 
-png(paste("./fig/", "CMAJ_F1", '.png', sep = ""), width = 8.5, height = 5, unit = "in", res = 320)
+png(paste("./fig/", "JID_F1", '.png', sep = ""), width = 12, height = 4, unit = "in", res = 320)
 par(mfrow = c(1, 1), family = fam, yaxs = "i", mar = c(4, 4.5, 2, 0))
 
-nf <- layout(matrix(c(1,2), ncol = 2, nrow = 1),
-             widths = c(lcm(9), lcm(12)), heights = lcm(10),
+nf <- layout(matrix(c(1, 2, 3, 4), ncol = 3, nrow = 1),
+             widths = c(lcm(9), lcm(9), lcm(12)),
+             heights = lcm(9),
              respect = TRUE)
 
 # plotting scenarios
@@ -134,8 +160,8 @@ plot(qc$nc_travel_symp  ~ qc$date, type = 'l', col = "#678096", lwd = 1,
      ylab = "", xlab = "", axes = FALSE)
 mtext("A) Observed and counterfactual scenarios", side = 3, line = 1, cex = 1)
 polygon(x = c(qc$date, rev(qc$date)),
-          y = c(rep(0, nrow(qc)), rev(qc$nc_travel_symp)),
-          col = transparent_col(color = "#678096", percent = 80), border = NA)
+        y = c(rep(0, nrow(qc)), rev(qc$nc_travel_symp)),
+        col = transparent_col(color = "#678096", percent = 80), border = NA)
 abline(h = seq(0, y_lim1[2], by = 25), col = "lightgray", lwd = 0.5)
 axis.Date(1, at = sel_date1, las = 2, format = "%b %d", cex.axis = 0.9)
 axis(2, at = seq(0, y_lim1[2], by = 25), labels = seq(0, y_lim1[2], by = 25), las = 1)
@@ -150,10 +176,43 @@ lines(I(qc$travel_ont_0308_toplot - 1.75) ~ qc$date, col = "#979461", lwd = 2, l
 legend("topleft", legend = c("Québec's imported cases (observed)", "Scenario: Ontario's imported cases",
                              "Scenario: No importations after March 8th", "Scenario: Same as Ontario after March 8th"),
        col = c(transparent_col(color = "#678096", percent = 70),
-               "#A12A19", "antiquewhite4", "#979461"),
+               "#A12A19", "antiquewhite3", "#979461"),
        pch = c(15, NA, NA, NA), pt.cex = c(1.5, NA, NA, NA),
-       lty = c(NA, 1, 1, 5), lwd = c(NA, 2, 2, 2), bty = 'n', cex = 0.75)
+       lty = c(NA, 1, 1, 5), lwd = c(NA, 2, 2, 2), bty = 'n', cex = 0.85)
 
+# ploting results: Hospital incidence
+plot(out$nh$median  ~ time_date, type = 'l', col = "#678096", lwd = 2, xlim = c(x_lim[1], x_lim[2]), ylim = c(0, 150),
+     ylab = "", xlab = "", axes = FALSE)
+mtext("B) Impact on daily number of hospitalizations", side = 3, line = 1, cex = 1)
+abline(h = seq(0, 150, by = 25), col = "lightgray", lwd = 0.5)
+polygon(x = c(time_date, rev(time_date)),
+        y = c(out$nh$lci, rev(out$nh$uci)),
+        col = transparent_col(color = "#678096", percent = 50), border = NA)
+polygon(x = c(time_date, rev(time_date)),
+        y = c(out_ont$nh$lci, rev(out_ont$nh$uci)),
+        col = transparent_col(color = "#A12A19", percent = 60), border = NA)
+polygon(x = c(time_date, rev(time_date)),
+        y = c(out_ont_0308$nh$lci, rev(out_ont_0308$nh$uci)),
+        col = transparent_col(color = "#979461", percent = 70), border = NA)
+polygon(x = c(time_date, rev(time_date)),
+        y = c(out_0308$nh$lci, rev(out_0308$nh$uci)),
+        col = transparent_col(color = "antiquewhite2", percent = 10), border = NA)
+
+lines(out_ont_0308$nh$median  ~ time_date, col = '#979461', lwd = 2, lty = 1)
+lines(out_0308$nh$median  ~ time_date, col = 'antiquewhite4', lwd = 2, lty = 1)
+lines(out_ont$nh$median  ~ time_date, col = '#A12A19', lwd = 2, lty = 1)
+lines(out$nh$median  ~ time_date, col = "#678096", lwd = 2)
+
+legend(x = x_lim[1] - 7, y = 151, legend = c("Québec's imported cases (observed scenario)",
+                                             "If same as Ontario",
+                                             "If same as Ontario after March 8th",
+                                             "If no importations after March 8th"),
+       col = c("#678096", "#A12A19", "#979461", "antiquewhite3"),
+       lty = 1, lwd = 2, bty = 'n', cex = 0.85, y.intersp = 0.8)
+
+axis.Date(1, at = sel_date, las = 2, format = "%b %d", cex.axis = 0.9)
+axis(2, at = seq(0, 150, by = 25), labels = seq(0, 150, by = 25), las = 1)
+mtext("Daily number of hospitalisations", side = 2, line = 3, cex = 1)
 
 # plotting results
 y_lim <- c(0, ceiling(max(out$cum_nh$uci) / 1000) * 1000)
@@ -162,14 +221,13 @@ pt_ont_0308 <- max(out_ont_0308$cum_nh$median)
 pt_0308 <- max(out_0308$cum_nh$median)
 pt_ont <- max(out_ont$cum_nh$median)
 
-plot(out$cum_nh$median  ~ time_date, type = 'l', col = "#678096", lwd = 2, xlim = c(x_lim[1], x_lim[2] + 60), ylim = y_lim,
+plot(out$cum_nh$median  ~ time_date, type = 'l', col = "#678096", lwd = 2, xlim = c(x_lim[1], x_lim[2] + 40), ylim = y_lim,
      ylab = "", xlab = "", axes = FALSE)
-mtext("B) Impact of scenarios on hospitalisations", side = 3, line = 1, cex = 1)
-#abline(h = seq(0, y_lim[2], by = 1000), col = "lightgray", lwd = 0.5)
+mtext("c) Impact on cumulative hospitalisations", side = 3, line = 1, cex = 1)
 segments(x0 = 0, y0 = seq(0, y_lim[2], by = 1000), x1 = x_lim[2], y1 = seq(0, y_lim[2], by = 1000), col = "lightgray", lwd = 0.5)
 polygon(x = c(time_date, rev(time_date)),
-          y = c(out$cum_nh$lci, rev(out$cum_nh$uci)),
-          col = transparent_col(color = "#678096", percent = 50), border = NA)
+        y = c(out$cum_nh$lci, rev(out$cum_nh$uci)),
+        col = transparent_col(color = "#678096", percent = 50), border = NA)
 polygon(x = c(time_date, rev(time_date)),
           y = c(out_ont_0308$cum_nh$lci, rev(out_ont_0308$cum_nh$uci)),
           col = transparent_col(color = "#979461", percent = 70), border = NA)
@@ -181,19 +239,111 @@ polygon(x = c(time_date, rev(time_date)),
           col = transparent_col(color = "#A12A19", percent = 60), border = NA)
 
 lines(out_ont_0308$cum_nh$median  ~ time_date, col = '#979461', lwd = 2, lty = 1)
-lines(out_0308$cum_nh$median  ~ time_date, col = 'antiquewhite3', lwd = 2, lty = 1)
+lines(out_0308$cum_nh$median  ~ time_date, col = 'antiquewhite4', lwd = 2, lty = 1)
 lines(out_ont$cum_nh$median  ~ time_date, col = '#A12A19', lwd = 2, lty = 1)
 lines(out$cum_nh$median  ~ time_date, col = "#678096", lwd = 2)
 points(x = x_lim[2], y = pt, pch = 21, cex = 1, col = "grey75", bg = "#678096")
 points(x = x_lim[2], y = pt_ont_0308, pch = 21, cex = 1, col = "grey75", bg = "#979461")
-points(x = x_lim[2], y = pt_0308, pch = 21, cex = 1, col = "grey75", bg = "antiquewhite2")
+points(x = x_lim[2], y = pt_0308, pch = 21, cex = 1, col = "grey75", bg = "antiquewhite3")
 points(x = x_lim[2], y = pt_ont, pch = 21, cex = 1, col = "grey75", bg = "#A12A19")
-text(x = x_lim[2] + 1, y = pt, labels = "Québec's imported cases \n (observed scenario)", pos = 4, cex = 0.5)
+points(x = x_lim[2], y = pt_measures_1w, pch = 21, cex = 1, col = "grey75", bg = "tan")
+text(x = x_lim[2] + 1, y = pt, labels = "Québec's imported cases \n (observed scenario)", pos = 4, cex = 0.85)
 text(x = x_lim[2] + 1, y = pt_ont + 60, labels = "If same as Ontario", pos = 4, cex = 0.5)
 text(x = x_lim[2] + 1, y = pt_ont_0308 - 60, labels = "If same as Ontario \n after March 8th", pos = 4, cex = 0.5)
+text(x = x_lim[2] + 1, y = pt_ont + 60, labels = "If same as Ontario", pos = 4, cex = 0.85)
 text(x = x_lim[2] + 1, y = pt_0308, labels = "If no importations \n after March 8th", pos = 4, cex = 0.5)
-  axis.Date(1, at = sel_date, las = 2, format = "%b %d", cex.axis = 0.9)
-  axis(2, at = seq(0, y_lim[2], by = 1000), labels = seq(0, y_lim[2], by = 1000), las = 1)
-  mtext("Cumulative number of hospitalisations", side = 2, line = 3, cex = 1)
+text(x = x_lim[2] + 1, y = pt_ont_0308 - 60, labels = "If same as Ontario \n after March 8th", pos = 4, cex = 0.85)
+axis.Date(1, at = sel_date, las = 2, format = "%b %d", cex.axis = 0.9)
+text(x = x_lim[2] + 1, y = pt_0308, labels = "If no importations \n after March 8th", pos = 4, cex = 0.85)
+axis.Date(1, at = sel_date, las = 2, format = "%b %d", cex.axis = 0.9)
+axis(2, at = seq(0, y_lim[2], by = 1000), labels = seq(0, y_lim[2], by = 1000), las = 1)
+mtext("Cumulative number of hospitalisations", side = 2, line = 3, cex = 1)
+
 dev.off()
 
+
+
+# ---- Plots for delayed measures scenarios ----
+png(paste("./fig/", "JID_F2", '.png', sep = ""),
+    width = 10, height = 5, unit = "in", res = 320)
+
+par(mfrow = c(1, 1), family = fam, yaxs = "i", mar = c(4, 4.5, 2, 0))
+nf <- layout(matrix(c(1, 2), ncol = 2, nrow = 1),
+             widths = c(lcm(11), lcm(13)), heights = lcm(11),
+             respect = TRUE)
+
+# ploting results: Hospital incidence
+plot(out$nh$median  ~ time_date, type = 'l', col = "#678096", lwd = 2,
+     xlim = c(x_lim[1], x_lim[2]), ylim = c(0, 300),
+     ylab = "", xlab = "", axes = FALSE)
+mtext("A) Impact of timing of control measures \n on daily number of hospitalisations", side = 3, line = 1, cex = 1)
+
+abline(h = seq(0, 250, by = 25), col = "lightgray", lwd = 0.5)
+
+polygon(x = c(time_date, rev(time_date)),
+        y = c(out$nh$lci, rev(out$nh$uci)),
+        col = transparent_col(color = "#678096", percent = 50), border = NA)
+polygon(x = c(time_date, rev(time_date)),
+        y = c(out_measures_1w_earlier$nh$lci, rev(out_measures_1w_earlier$nh$uci)),
+        col = transparent_col(color = "#E19600", percent = 50), border = NA)
+polygon(x = c(time_date, rev(time_date)),
+        y = c(out_measures_1w_later$nh$lci, rev(out_measures_1w_later$nh$uci)),
+        col = transparent_col(color = "#7D3232", percent = 50), border = NA)
+
+lines(out_measures_1w_earlier$nh$median  ~ time_date, col = "#E19600", lwd = 2)
+lines(out_measures_1w_later$nh$median  ~ time_date, col = "#7D3232", lwd = 2)
+lines(out$nh$median ~ time_date, col = "#678096", lwd = 2)
+
+legend(x = x_lim[1] - 7, y = 300, legend = c("Québec observed sequences of measures",
+                                             "If measures implemented 1 week earlier",
+                                             "If measures implemented 1 week later"),
+       col = c("#678096", "#E19600", "#7D3232"),
+       lty = 1, lwd = 2, bty = 'n', cex = 0.85, y.intersp = 0.8)
+
+axis.Date(1, at = sel_date, las = 2, format = "%b %d", cex.axis = 0.9)
+axis(2, at = seq(0, 250, by = 25), labels = seq(0, 250, by = 25), las = 1)
+mtext("Daily number of hospitalisations", side = 2, line = 3, cex = 1)
+
+# plotting results: cumulative hospitalization
+y_lim <- c(0, ceiling(max(out_measures_1w_later$cum_nh$uci) / 1000) * 1000 + 500)
+pt <- max(out$cum_nh$median)
+pt_measures_1w_earlier <- max(out_measures_1w_earlier$cum_nh$median)
+pt_measures_1w_later <- max(out_measures_1w_later$cum_nh$median)
+
+plot(out$cum_nh$median  ~ time_date, type = 'l', col = "#678096", lwd = 2,
+     xlim = c(x_lim[1], x_lim[2] + 60), ylim = y_lim,
+     ylab = "", xlab = "", axes = FALSE)
+mtext("B) Impact of timing of control measures \n on cumulative hospitalisations", side = 3, line = 1, cex = 1)
+#abline(h = seq(0, y_lim[2], by = 1000), col = "lightgray", lwd = 0.5)
+segments(x0 = 0, y0 = seq(0, y_lim[2], by = 1000), x1 = x_lim[2], y1 = seq(0, y_lim[2], by = 1000), col = "lightgray", lwd = 0.5)
+polygon(x = c(time_date, rev(time_date)),
+        y = c(out$cum_nh$lci, rev(out$cum_nh$uci)),
+        col = transparent_col(color = "#678096", percent = 50), border = NA)
+polygon(x = c(time_date, rev(time_date)),
+        y = c(out_measures_1w_earlier$cum_nh$lci, rev(out_measures_1w_earlier$cum_nh$uci)),
+        col = transparent_col(color = "#E19600", percent = 50), border = NA)
+polygon(x = c(time_date, rev(time_date)),
+        y = c(out_measures_1w_later$cum_nh$lci, rev(out_measures_1w_later$cum_nh$uci)),
+        col = transparent_col(color = "#7D3232", percent = 50), border = NA)
+
+
+lines(out_measures_1w_earlier$cum_nh$median  ~ time_date, col = "#E19600", lwd = 2)
+lines(out_measures_1w_later$cum_nh$median  ~ time_date, col = "#7D3232", lwd = 2)
+lines(out$cum_nh$median  ~ time_date, col = "#678096", lwd = 2)
+points(x = x_lim[2], y = pt, pch = 21, cex = 1, col = "grey75", bg = "#678096")
+points(x = x_lim[2], y = pt_measures_1w_earlier, pch = 21, cex = 1, col = "grey75", bg = "tan")
+points(x = x_lim[2], y = pt_measures_1w_later, pch = 21, cex = 1, col = "grey75", bg = "#7D3232")
+
+text(x = x_lim[2] + 1, y = pt, labels = "Québec's measures \n (observed scenario)", pos = 4, cex = 0.75)
+text(x = x_lim[2] + 1, y = pt_measures_1w_earlier, labels = "If measures \n 1 week earlier", pos = 4, cex = 0.75)
+text(x = x_lim[2] + 1, y = pt_measures_1w_later, labels = "If measures \n 1 week later", pos = 4, cex = 0.75)
+
+axis.Date(1, at = sel_date, las = 2, format = "%b %d", cex.axis = 0.9)
+axis(2, at = seq(0, y_lim[2], by = 1000), labels = seq(0, y_lim[2], by = 1000), las = 1)
+axis(2, at = seq(0, y_lim[2], by = 1000), labels = seq(0, y_lim[2], by = 1000), las = 1)
+mtext("Cumulative number of hospitalisations", side = 2, line = 3, cex = 1)
+mtext("Cumulative number of hospitalisations", side = 2, line = 3, cex = 1)
+
+
+dev.off()
+dev.off()
